@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление гостиницей</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Система управления номерами гостиницы</h1>
+        <div class="main-grid">
+            <div class="forms-section">
+                <div class="form-card">
+                    <h2>Регистрация гостя</h2>
+                    <form id="guestForm">
+                        <div class="form-group">
+                            <label>Фамилия</label>
+                            <input type="text" id="lastName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Имя</label>
+                            <input type="text" id="firstName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Отчество</label>
+                            <input type="text" id="middleName">
+                        </div>
+                        <div class="form-group">
+                            <label>Паспортные данные</label>
+                            <input type="text" id="passport" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Код гостя (генерируется автоматически)</label>
+                            <input type="text" id="guestCode" readonly>
+                        </div>
+                        <button type="submit">Добавить гостя</button>
+                    </form>
+                </div>
+
+                <div class="form-card">
+                    <h2>Заселение</h2>
+                    <form id="checkInForm">
+                        <div class="form-group">
+                            <label>Код гостя</label>
+                            <select id="selectGuestCode" required>
+                                <option value="">Выберите гостя</option>
+                            </select>
+                        </div>
+                        <div id="guestsContainer">
+
+                        </div>
+                        <button type="button" onclick="addGuestSelect()" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%); margin-top: 5px;">
+                            + Добавить гостя
+                        </button>
+                        <div class="form-group">
+                            <label>Номер комнаты</label>
+                            <select id="selectRoomCode" required>
+                                <option value="">Выберите номер</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Дата заселения</label>
+                            <input type="date" id="checkInDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Дата освобождения</label>
+                            <input type="date" id="checkOutDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Код заселения (генерируется автоматически)</label>
+                            <input type="text" id="checkInCode" readonly>
+                        </div>
+                        <button type="submit">Заселить</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="rooms-section">
+                <h2>Номера гостиницы</h2>
+                <div class="rooms-grid" id="roomsGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let guests = [];
+        let rooms = [];
+        let checkIns = [];
+        let guestSelectCounter = 1;
+
+        function initRooms() {
+            const comfortLevels = [
+                ...Array(9).fill('Стандарт'),
+                ...Array(6).fill('Комфорт'),
+                ...Array(3).fill('Люкс'),
+            ];
+            
+            const prices = {
+                'Стандарт': 2500,
+                'Комфорт': 4000,
+                'Люкс': 7000,
+            };
+
+            for (let i = 1; i <= 18; i++) {
+                rooms.push({
+                    code: `r${String(i).padStart(3, '0')}`,
+                    number: i,
+                    capacity: i <= 9 ? 2 : (i <= 15 ? 4 : 3),
+                    comfort: comfortLevels[i - 1],
+                    price: prices[comfortLevels[i - 1]]
+                });
+            }
+            
+            saveData();
+            renderRooms();
+        }
+
+        function saveData() {
+            localStorage.setItem('hotelGuests', JSON.stringify(guests));
+            localStorage.setItem('hotelRooms', JSON.stringify(rooms));
+            localStorage.setItem('hotelCheckIns', JSON.stringify(checkIns));
+        }
+
+        function loadData() {
+            const savedGuests = localStorage.getItem('hotelGuests');
+            const savedRooms = localStorage.getItem('hotelRooms');
+            const savedCheckIns = localStorage.getItem('hotelCheckIns');
+
+            if (savedGuests) guests = JSON.parse(savedGuests);
+            if (savedRooms) rooms = JSON.parse(savedRooms);
+            if (savedCheckIns) checkIns = JSON.parse(savedCheckIns);
+
+            if (rooms.length === 0) {
+                initRooms();
+            } else {
+                renderRooms();
+            }
+        }
+
+        function renderRooms() {
+            const grid = document.getElementById('roomsGrid');
+            grid.innerHTML = '';
+
+            rooms.forEach(room => {
+                const checkIn = checkIns.find(ci => ci.roomCode === room.code);
+                const guest = checkIn ? guests.find(g => g.code === checkIn.guestCode) : null;
+                const isOccupied = !!checkIn;
+
+                const comfortClass = room.comfort === 'Стандарт' ? 'comfort-standard' : 
+                                   room.comfort === 'Комфорт' ? 'comfort-comfort' : 'comfort-luxury';
+
+                const card = document.createElement('div');
+                card.className = `room-card ${isOccupied ? 'occupied' : 'free'} ${comfortClass}`;
+                card.innerHTML = `
+                    <span class="status-badge ${isOccupied ? 'status-occupied' : 'status-free'}">
+                        ${isOccupied ? 'Занят' : 'Свободен'}
+                    </span>
+                    <div class="room-number">Номер ${room.number}</div>
+                    <div class="room-info">Код: ${room.code}</div>
+                    <div class="room-info">Вместимость: ${room.capacity} чел.</div>
+                    <div class="room-info">Комфорт: ${room.comfort}</div>
+                    <div class="room-info">Цена: ${room.price} ₽/сутки</div>
+                    ${checkIn ? `
+                        <div class="room-guest">
+                            ${checkIn.guestCodes.map(code => {
+                                const g = guests.find(guest => guest.code === code);
+                                return g ? `${g.lastName} ${g.firstName.charAt(0)}. ${g.middleName ? g.middleName.charAt(0) + '.' : ''}` : '';
+                            }).join('<br>')}
+                        </div>
+                        <div class="room-dates">
+                            ${checkIn.checkInDate} — ${checkIn.checkOutDate}
+                        </div>
+                        <button class="delete-btn" onclick="checkOut('${room.code}')">Выселить</button>
+                    ` : ''}
+                `;
+                grid.appendChild(card);
+            });
+
+            updateGuestSelect();
+            updateRoomSelect();
+        }
+
+        function updateGuestSelect() {
+            const select = document.getElementById('selectGuestCode');
+            select.innerHTML = '<option value="">Выберите гостя</option>';
+            guests.forEach(guest => {
+                select.innerHTML += `<option value="${guest.code}">${guest.lastName} ${guest.firstName} (${guest.code})</option>`;
+            });
+        }
+
+        function updateRoomSelect() {
+            const select = document.getElementById('selectRoomCode');
+            select.innerHTML = '<option value="">Выберите номер</option>';
+            rooms.forEach(room => {
+                const isOccupied = checkIns.some(ci => ci.roomCode === room.code);
+                if (!isOccupied) {
+                    select.innerHTML += `<option value="${room.code}">Номер ${room.number} (${room.comfort})</option>`;
+                }
+            });
+        }
+
+        function generateGuestCode(lastName, firstName, middleName) {
+            const getChars = (str, count) => {
+                if (!str) return '00';
+                const cleaned = str.replace(/[^А-Яа-яA-Za-z]/g, '');
+                const formatted = cleaned.charAt(0).toUpperCase() + cleaned.charAt(1).toLowerCase();
+                return formatted.padEnd(count, '0').substring(0, count);
+            };
+
+            const lastNamePart = getChars(lastName, 2);
+            const firstNamePart = getChars(firstName, 2);
+            const middleNamePart = getChars(middleName, 2);
+
+            const guestNumber = guests.length + 1;
+            const numberPart = '7' + String(guestNumber).padStart(2, '0');
+
+            return lastNamePart + firstNamePart + middleNamePart + numberPart;
+        }
+
+
+        function updateGuestCode() {
+            const lastName = document.getElementById('lastName').value;
+            const firstName = document.getElementById('firstName').value;
+            const middleName = document.getElementById('middleName').value;
+            const passport = document.getElementById('passport').value;
+
+            if (lastName && firstName && passport) {
+                const code = generateGuestCode(lastName, firstName, middleName);
+                document.getElementById('guestCode').value = code;
+            } else {
+                document.getElementById('guestCode').value = '';
+            }
+        }
+
+        document.getElementById('lastName').addEventListener('input', updateGuestCode);
+        document.getElementById('firstName').addEventListener('input', updateGuestCode);
+        document.getElementById('middleName').addEventListener('input', updateGuestCode);
+        document.getElementById('passport').addEventListener('input', updateGuestCode);
+
+        function generateCheckInCode(guestCode) {
+            if (!guestCode) return '';
+            
+            const guest = guests.find(g => g.code === guestCode);
+            if (!guest) return '';
+
+            const year = new Date().getFullYear();
+            const lastNamePart = guest.lastName.substring(0, 1).toUpperCase();
+            const firstNamePart = guest.firstName.substring(0, 1).toUpperCase();
+            const middleNamePart = guest.middleName ? guest.middleName.substring(0, 1).toUpperCase() : '0';
+            
+            const numberPart = guest.code.slice(-2);
+
+            return `CI${year}${lastNamePart}${firstNamePart}${middleNamePart}${numberPart}`;
+        }
+
+        function updateCheckInCode() {
+            const guestCode = document.getElementById('selectGuestCode').value;
+            if (guestCode) {
+                const code = generateCheckInCode(guestCode);
+                document.getElementById('checkInCode').value = code;
+            } else {
+                document.getElementById('checkInCode').value = '';
+            }
+        }
+
+        document.getElementById('selectGuestCode').addEventListener('change', updateCheckInCode);
+
+        document.getElementById('guestForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const code = document.getElementById('guestCode').value;
+            
+            if (!code) {
+                alert('Заполните все обязательные поля для генерации кода!');
+                return;
+            }
+
+            if (guests.some(g => g.code === code)) {
+                alert('Гость с таким кодом уже существует!');
+                return;
+            }
+
+            guests.push({
+                code: code,
+                lastName: document.getElementById('lastName').value,
+                firstName: document.getElementById('firstName').value,
+                middleName: document.getElementById('middleName').value,
+                passport: document.getElementById('passport').value
+            });
+
+            saveData();
+            renderRooms();
+            e.target.reset();
+            alert('Гость успешно добавлен!');
+        });
+
+        document.getElementById('checkInForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const code = document.getElementById('checkInCode').value;
+            const roomCode = document.getElementById('selectRoomCode').value;
+            const checkInDate = document.getElementById('checkInDate').value;
+            const checkOutDate = document.getElementById('checkOutDate').value;
+            const guestCodes = getSelectedGuests();
+            const room = rooms.find(r => r.code === roomCode);
+
+            if (!code) {
+                alert('Выберите гостя для генерации кода заселения!');
+                return;
+            }
+
+            if (checkIns.some(ci => ci.code === code)) {
+                alert('Заселение с таким кодом уже существует!');
+                return;
+            }
+
+            if (guestCodes.length > room.capacity) {
+                alert(`Превышена вместимость! Максимум ${room.capacity} чел.`);
+                return;
+            }
+
+            if (new Date(checkInDate) >= new Date(checkOutDate)) {
+                alert('Дата заселения должна быть раньше даты выселения!');
+                return;
+            }
+
+            // валидация
+            const existingCheckIn = checkIns.find(ci => ci.roomCode === roomCode);
+            if (existingCheckIn) {
+                alert('Этот номер уже занят!');
+                return;
+            }
+
+            checkIns.push({
+                code: code,
+                guestCodes: guestCodes,
+                roomCode: roomCode,
+                checkInDate: checkInDate,
+                checkOutDate: checkOutDate
+            });
+
+            saveData();
+            renderRooms();
+            e.target.reset();
+            document.getElementById('guestsContainer').innerHTML = '';
+            guestSelectCounter = 1;
+            alert('Гость успешно заселен!');
+        });
+
+        function addGuestSelect() {
+            const container = document.getElementById('guestsContainer');
+            const div = document.createElement('div');
+            div.className = 'form-group';
+            div.id = `guest-select-${guestSelectCounter}`;
+            div.innerHTML = `
+                <label>Гость ${guestSelectCounter + 1}</label>
+                <div style="display: flex; gap: 5px;">
+                    <select class="additional-guest-select" style="width: 85%;" required>
+                        <option value="">Выберите гостя</option>
+                        ${guests.map(g => `<option value="${g.code}">${g.lastName} ${g.firstName} (${g.code})</option>`).join('')}
+                    </select>
+                    <button type="button" onclick="removeGuestSelect(${guestSelectCounter})" 
+                            style="width: 15%; padding: 5px; background: #ef4444;">✕</button>
+                </div>
+            `;
+            container.appendChild(div);
+            guestSelectCounter++;
+        }
+
+        function removeGuestSelect(id) {
+            document.getElementById(`guest-select-${id}`).remove();
+        }
+
+        function getSelectedGuests() {
+            const codes = [document.getElementById('selectGuestCode').value];
+            document.querySelectorAll('.additional-guest-select').forEach(select => {
+                if (select.value) codes.push(select.value);
+            });
+            return codes;
+        }
+
+        function checkOut(roomCode) {
+            if (confirm('Выселить гостя из этого номера?')) {
+                checkIns = checkIns.filter(ci => ci.roomCode !== roomCode);
+                saveData();
+                renderRooms();
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
